@@ -1,27 +1,28 @@
 """ Stores every alteration of a provided page (url) """
 
-import urllib3
+import requests
 from bs4 import BeautifulSoup
-http = urllib3.PoolManager()
 
-base_url = "http://deutschpatrioten.de/"
+# base_url = "http://deutschpatrioten.de/"
+base_url = "https://api.github.com/events"
 
-request = http.request('GET', base_url)
+response = requests.get(base_url)
 
-soup = BeautifulSoup(request.data, 'html.parser')
+soup = BeautifulSoup(response.text, 'html.parser')
 
+print(soup.prettify())
 # alle topics beginnen mit id = "boardLinkxy"
-anchors = soup.find_all('a')
-links = []
-for a in anchors:
-    id = a.get('id')
-    try:
-        if id.startswith("boardLink"):
-            links.append(a.get('href'))
-    except AttributeError:
-        next
+# anchors = soup.find_all('a')
+# links = []
+# for a in anchors:
+#    id = a.get('id')
+#    try:
+#        if id.startswith("boardLink"):
+#            links.append(a.get('href'))
+#    except AttributeError:
+#        next
 
-print(links)
+# print(links)
 
 
 
