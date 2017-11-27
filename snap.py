@@ -2,16 +2,32 @@
 
 import urllib3
 from bs4 import BeautifulSoup
-
-url = "https://forums.theuniversim.com/index.php?/forum/59-forums-rules-and-important-information/"
-
 http = urllib3.PoolManager()
 
-request = http.request('GET', url)
+base_url = "http://deutschpatrioten.de/"
+
+request = http.request('GET', base_url)
 
 soup = BeautifulSoup(request.data, 'html.parser')
 
-print(soup.prettify())
+# alle topics beginnen mit id = "boardLinkxy"
+anchors = soup.find_all('a')
+links = []
+for a in anchors:
+    id = a.get('id')
+    try:
+        if id.startswith("boardLink"):
+            links.append(a.get('href'))
+    except AttributeError:
+        next
+
+print(links)
+
+
+
+# print(soup.find('base'))
+
+# print(soup.prettify())
 
 # def substring(s, n):
     # """ returns substrings of length n """
