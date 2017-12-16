@@ -6,6 +6,8 @@ import os
 import sqlite3
 import logging
 from datetime import datetime
+from datetime import timedelta
+from apscheduler.schedulers.blocking import BlockingScheduler
 
 import requests
 from bs4 import BeautifulSoup
@@ -40,7 +42,7 @@ def adjustThreads(db_cursor, thread_user_name, thread_time,
     # if thread does not exist, create entry
     if thread_id is None:
         is_new_thread = True
-        # print("INFO: New thread opened by user {} at {}.".format(thread_user_name, thread_time))
+        # logging.info("New thread opened by user {} at {}.".format(thread_user_name, thread_time))
         # enter new thread into db
         db_cursor.execute("INSERT INTO Threads(UserName, Time, Title, ThreadURL, BaseURL)"
                           " VALUES(?, ?, ?, ?, ?)", (thread_user_name, thread_time, thread_title, thread_url, BASE_URL, ))
@@ -77,15 +79,11 @@ def adjustPosts(db_cursor, thread_id, post_user_name,
     }
     return(dict)
 
-if __name__ == "__main__":
+def main():
 
-    # start log
-    logging.basicConfig(filename='dpat_snap.log', level=logging.DEBUG)
+    logging.info("Starting check.")
 
-    # set locale for datetime conversion
-    locale.setlocale(locale.LC_ALL, 'deu_deu')
-
-    # ----------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
     # log into page for session
 
     # open session to persist parameters and cookies
@@ -104,14 +102,14 @@ if __name__ == "__main__":
         response = session.post(BASE_URL + LOGIN_URL, timeout=5, stream=False, data=login_payload)
         # check if login successful
         if response.status_code == requests.codes.ok:
-            print("INFO: Login successful.")
+            logging.info("Login successful.")
         else:
-            print("ERROR: Login failed.")
+            logging.error("Login failed.")
             response.raise_for_status()
     except requests.exceptions.RequestException as e:
         logging.error(str(e))
 
-    # ----------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
     # find new posts on LATEST_POSTS_URL
 
     # read page indicating the latest posts
@@ -157,7 +155,7 @@ if __name__ == "__main__":
             except IndexError:
                 post_time = thread_time
 
-            # --------------------------------------------------------------------------------------------------------------
+            # ----------------------------------------------------------------------------------------------------------
             # adjust meta info with db, save new post as html
 
             # adjust with Threads in db
@@ -181,13 +179,35 @@ if __name__ == "__main__":
                 html_soup = getContent(session, BASE_URL + post_info['url'])
 
                 # save html
-                file_name = post_time.replace(":", "-") + " " +  post_user_name + '.html'
-                file_path = os.path.join(dir_path,  file_name)
+                file_name = post_time.replace(":", "-") + " " + post_user_name + '.html'
+                file_path = os.path.join(dir_path, file_name)
                 with io.open(file_path, 'w', encoding='utf8') as file:
                     file.write(str(html_soup))
-                logging.info("INFO: Saved new post of user {} at {}, saved as html.".format(post_user_name, post_time))
-                print("INFO: Saved new post of user {} at {}, saved as html.".format(post_user_name, post_time))
 
+                logging.info("Saved new post of user {} at {}, saved as html.".format(post_user_name, post_time))
+    logging.info("Check ended.")
+
+if __name__ == "__main__":
+
+    # start log
+    logging.basicConfig(filename='dpat_snap.log',
+                        level=logging.DEBUG,
+                        format='%(asctime)s %(levelname)s %(message)s (%(name)s)')
+    logging.getLogger().addHandler(logging.StreamHandler())     # show messages also in console
+
+    # set locale for datetime conversion
+    locale.setlocale(locale.LC_ALL, 'deu_deu')
+
+    # schedule call of main function
+    scheduler = BlockingScheduler()
+    interval = 60
+    scheduler.add_job(main, 'interval', minutes=interval, start_date=datetime.now() + timedelta(seconds=1))
+    logging.info('Scheduler started with {} minute interval. Press Ctrl + Break to exit.'.format(interval))
+
+    try:
+        scheduler.start()
+    except KeyboardInterrupt:
+        sys.exit()
 
 # code to execute for debugging in console
 # table = db.execute("SELECT * FROM Threads ORDER BY Time DESC")
