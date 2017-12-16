@@ -4,6 +4,7 @@ import io
 import locale
 import os
 import sqlite3
+import logging
 from datetime import datetime
 
 import requests
@@ -17,12 +18,11 @@ def getContent(session, url):
     try:
         response = session.get(url, timeout=5, stream=False)
     except requests.exceptions.RequestException as e:
-        print("ERROR: " + str(e))
+        logging.error(str(e))
 
     # check for other (noncritical) errors
     if not response.status_code == requests.codes.ok:
-        print('ERROR: Something went wrong.')
-        response.raise_for_status()
+        logging.warning(response.raise_for_status())
 
     # parse code to soup
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -40,7 +40,7 @@ def adjustThreads(db_cursor, thread_user_name, thread_time,
     # if thread does not exist, create entry
     if thread_id is None:
         is_new_thread = True
-        print("INFO: New thread opened by user {} at {}.".format(thread_user_name, thread_time))
+        # print("INFO: New thread opened by user {} at {}.".format(thread_user_name, thread_time))
         # enter new thread into db
         db_cursor.execute("INSERT INTO Threads(UserName, Time, Title, ThreadURL, BaseURL)"
                           " VALUES(?, ?, ?, ?, ?)", (thread_user_name, thread_time, thread_title, thread_url, BASE_URL, ))
@@ -65,7 +65,6 @@ def adjustPosts(db_cursor, thread_id, post_user_name,
     # if post does not exist, create entry
     if post_id is None:
         is_new_post = True
-        print("INFO: New post of user {} at {}, saved as html.".format(post_user_name, post_time))
         # enter new post into db
         db_cursor.execute("INSERT INTO Posts(ThreadID, UserName, Time, PostURL, BaseURL)"
                           " VALUES(?, ?, ?, ?, ?)", (thread_id, post_user_name, post_time, post_url, BASE_URL, ))
@@ -79,6 +78,9 @@ def adjustPosts(db_cursor, thread_id, post_user_name,
     return(dict)
 
 if __name__ == "__main__":
+
+    # start log
+    logging.basicConfig(filename='dpat_snap.log', level=logging.DEBUG)
 
     # set locale for datetime conversion
     locale.setlocale(locale.LC_ALL, 'deu_deu')
@@ -107,7 +109,7 @@ if __name__ == "__main__":
             print("ERROR: Login failed.")
             response.raise_for_status()
     except requests.exceptions.RequestException as e:
-        print("ERROR: " + str(e))
+        logging.error(str(e))
 
     # ----------------------------------------------------------------------------------------------------------------------
     # find new posts on LATEST_POSTS_URL
@@ -183,6 +185,9 @@ if __name__ == "__main__":
                 file_path = os.path.join(dir_path,  file_name)
                 with io.open(file_path, 'w', encoding='utf8') as file:
                     file.write(str(html_soup))
+                logging.info("INFO: Saved new post of user {} at {}, saved as html.".format(post_user_name, post_time))
+                print("INFO: Saved new post of user {} at {}, saved as html.".format(post_user_name, post_time))
+
 
 # code to execute for debugging in console
 # table = db.execute("SELECT * FROM Threads ORDER BY Time DESC")
