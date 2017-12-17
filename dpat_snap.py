@@ -211,7 +211,12 @@ if __name__ == "__main__":
         level=logging.DEBUG,
         format='%(asctime)s %(levelname)s %(message)s (%(name)s)'
     )
-    logging.getLogger().addHandler(logging.StreamHandler())     # show messages also in console
+
+    # show some messages also in shell
+    shell_log = logging.StreamHandler()
+    shell_log.setLevel(logging.INFO)
+    shell_log.setFormatter(logging.Formatter('%(levelname)s %(message)s (%(name)s)'))
+    logging.getLogger().addHandler(shell_log)
 
     # get commandline arguments
     args = commandline()
@@ -227,7 +232,7 @@ if __name__ == "__main__":
         minutes=args.interval,
         start_date=datetime.now() + timedelta(seconds=1)
     )
-    logging.info('Scheduler configured with {} minute interval. Press Ctrl + Break to exit.'.format(args.interval))
+    logging.info('Scheduler configured with {} minutes interval. Press Ctrl + Break to exit.'.format(args.interval))
 
     try:
         scheduler.start()
