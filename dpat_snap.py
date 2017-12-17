@@ -1,8 +1,10 @@
-""" Keeps track of new forum posts and stores them as html files. """
+""" Keeps track of new posts and stores them as html files. """
 
 import io
 import locale
 import os
+import re
+import argparse
 import sqlite3
 import logging
 from datetime import datetime
@@ -14,6 +16,16 @@ from bs4 import BeautifulSoup
 
 from dpat_config import *
 
+def commandline():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        "--interval",
+        type=int,
+        required=False,
+        default=60,
+        help="Time interval for checks (in minutes)."
+    )
+    return parser.parse_args()
 
 def getContent(session, url):
 # get html code from url and return as soup object
@@ -137,7 +149,8 @@ def main():
             thread_user_name = anchors[1].get_text()
             raw_time = row.find_all('p')[1].get_text()
             raw_time = raw_time[raw_time.find("(") + 1:raw_time.find(")")]
-            thread_time = datetime.strptime(raw_time, '%d. %B %Y, %H:%M').__str__()
+            thread_time_dt = datetime.strptime(raw_time, '%d. %B %Y, %H:%M')
+            thread_time = thread_time_dt.__str__()
 
             # post meta info
             try:
@@ -151,9 +164,13 @@ def main():
             try:
                 raw_time = row.find_all('p')[4].get_text()
                 raw_time = raw_time[raw_time.find("(") + 1:raw_time.find(")")]
-                post_time = datetime.strptime(raw_time, '%d. %B %Y, %H:%M').__str__()
+                post_time_dt = datetime.strptime(raw_time, '%d. %B %Y, %H:%M')
+                post_time = post_time_dt.__str__()
+                post_date = post_time_dt.date().__str__()
             except IndexError:
-                post_time = thread_time
+                post_time_dt = thread_time_dt
+                post_time = post_time_dt.__str__()
+                post_date = post_time_dt.date().__str__()
 
             # ----------------------------------------------------------------------------------------------------------
             # adjust meta info with db, save new post as html
@@ -169,8 +186,7 @@ def main():
             # save html of new post
             if post_info['is new']:
                 # create directory to store htmls
-                cur_date = datetime.now().date().__str__()
-                dir_path = os.path.join(SAVE_PATH, cur_date)
+                dir_path = os.path.join(SAVE_PATH, post_date)
                 if not os.path.exists(dir_path):
                     os.makedirs(dir_path)
                 # get post
@@ -190,19 +206,28 @@ def main():
 if __name__ == "__main__":
 
     # start log
-    logging.basicConfig(filename='dpat_snap.log',
-                        level=logging.DEBUG,
-                        format='%(asctime)s %(levelname)s %(message)s (%(name)s)')
+    logging.basicConfig(
+        filename='dpat_snap.log',
+        level=logging.DEBUG,
+        format='%(asctime)s %(levelname)s %(message)s (%(name)s)'
+    )
     logging.getLogger().addHandler(logging.StreamHandler())     # show messages also in console
+
+    # get commandline arguments
+    args = commandline()
 
     # set locale for datetime conversion
     locale.setlocale(locale.LC_ALL, 'deu_deu')
 
     # schedule call of main function
     scheduler = BlockingScheduler()
-    interval = 60
-    scheduler.add_job(main, 'interval', minutes=interval, start_date=datetime.now() + timedelta(seconds=1))
-    logging.info('Scheduler started with {} minute interval. Press Ctrl + Break to exit.'.format(interval))
+    scheduler.add_job(
+        main,
+        'interval',
+        minutes=args.interval,
+        start_date=datetime.now() + timedelta(seconds=1)
+    )
+    logging.info('Scheduler configured with {} minute interval. Press Ctrl + Break to exit.'.format(args.interval))
 
     try:
         scheduler.start()
